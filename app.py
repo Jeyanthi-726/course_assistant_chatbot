@@ -24,8 +24,8 @@ def get_chat_response(chat_model, messages, system_prompt):
         response = chat_model.invoke(formatted_messages)
         return response.content
     
-    except Exception as e:
-        return f"Error getting response: {str(e)}"
+    except Exception :
+        return st.write( "Model initialization failed! Please check your API key or Network")
     
 def instructions_page():
     """Instructions and setup page"""
@@ -66,26 +66,32 @@ def chat_page():
     Use the provided course materials to answer student questions.
     If not available, use web search to find accurate, up-to-date answers."""
 
-    chat_model = get_chatgroq_model()
+    try:
+        chat_model = get_chatgroq_model()
+    except Exception :
+        return  "Model initialize Failed! "
 
 #     # === Sidebar options ===
     with st.sidebar:
         st.subheader("Choose Explanation")
         response_mode = st.radio( "Answer ",["Concise", "Detailed"])
         st.divider()
-        uploaded_file = st.file_uploader("Upload Course File", type=["pdf"])
+        try:
+            uploaded_file = st.file_uploader("Upload Course File", type=["pdf"])
     
-        if uploaded_file:
-        # Read bytes directly from memory
-            file_bytes = uploaded_file.read()
-            pdf_reader = PdfReader(io.BytesIO(file_bytes))
-            text = ""
-            for page in pdf_reader.pages:
-                text += page.extract_text()
+            if uploaded_file:
+            # Read bytes directly from memory
+                file_bytes = uploaded_file.read()
+                pdf_reader = PdfReader(io.BytesIO(file_bytes))
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text()
 
-            # st.write("Extracted text:", text[:500])
-            st.session_state["doc_text"] = text
-            st.success("PDF uploaded successfully and ready for Q&A!")
+                st.session_state["doc_text"] = text
+                st.success("PDF uploaded successfully and ready for Q&A!")
+        except Exception :
+            return " Failed to read PDF. Please try again."
+            
         st.divider()
         if st.button("🗑️ Clear Chat History", use_container_width=True):
             st.session_state.messages = []
@@ -112,22 +118,25 @@ def chat_page():
         # Generate and display bot response
         with st.chat_message("assistant"):
             with st.spinner("Getting response..."):
-                if "doc_text" in st.session_state:
-                    context = st.session_state["doc_text"]
-                    combined_prompt = f"Document Context:\n{context}\n\nQuestion: {prompt}"
-                else:
-                    st.info("🔍 No local info found. Searching the web...")
-                    context = web_search(prompt)
-                    combined_prompt = f"External Info:\n{context}\n\nQuestion: {prompt}"
+                try:
+                    if "doc_text" in st.session_state:
+                        context = st.session_state["doc_text"]
+                        combined_prompt = f"Document Context:\n{context}\n\nQuestion: {prompt}"
+                    else:
+                        st.info("🔍 No local info found. Searching the web...")
+                        context = web_search(prompt)
+                        combined_prompt = f"External Info:\n{context}\n\nQuestion: {prompt}"
 
-                if response_mode == "Concise":
-                    combined_prompt += "\nPlease give a short and focused answer."
-                else:
-                    combined_prompt += "\nPlease give a detailed explanation."
+                    if response_mode == "Concise":
+                        combined_prompt += "\nPlease give a short and focused answer."
+                    else:
+                        combined_prompt += "\nPlease give a detailed explanation."
 
-                response = get_chat_response(chat_model, st.session_state.messages, combined_prompt)
-                st.markdown(response)
-        
+                    response = get_chat_response(chat_model, st.session_state.messages, combined_prompt)
+                    st.markdown(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                except Exception :
+                    return  "Could not get response from model "
         # Add bot response to chat history
         st.session_state.messages.append({"role": "assistant", "content": response})
 
